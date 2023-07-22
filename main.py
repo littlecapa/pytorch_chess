@@ -5,7 +5,8 @@ from chess_nn_trainer import Chess_NN_Trainer
 
 FILEPATH = "G:/Meine Ablage/data/nn_chess/"
 FILE_PREFIX ="commentated_li_"
-FILE_RANGE = 1
+FILE_RANGE = 2
+SMALL_TEST = False
 
 def setup_logging():
     logging.basicConfig(
@@ -27,11 +28,16 @@ def main():
     logging.info('Starting the program')
 
     check_env()
+    first_training = True
     
     for i in range(FILE_RANGE):
-        input_file = FILEPATH + FILE_PREFIX + str(i) + ".csv"
-        trainer = Chess_NN_Trainer(input_file)
-        trainer.train()
+        if SMALL_TEST:
+            input_file = FILEPATH + "commentated_wolga_9.csv"
+        else:
+            input_file = FILEPATH + FILE_PREFIX + str(i) + ".csv"
+        trainer = Chess_NN_Trainer(FILEPATH, input_file, use_halfkp = False)
+        trainer.train(first_training = first_training)
+        first_training = False
 
     logging.info('Program execution completed')
 

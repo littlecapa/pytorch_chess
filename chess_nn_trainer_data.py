@@ -25,8 +25,10 @@ class Chess_NN_Trainer_Data(Dataset):
 
     def convert_int64_to_int32(self, int64_tensor):
         # Check if the input tensor has the correct shape (13x1)
-        if int64_tensor.shape != (13, 1):
-            raise ValueError("Input tensor must have shape (13, 1)")
+        if int64_tensor.shape != torch.Size([13]):
+            logging.error(f"Int64 Tensor Shape: {int64_tensor.shape}")
+            logging.error(f"Int64 Tensor Value: {int64_tensor}")
+            raise ValueError("Input tensor must have torch.Size([13])")
 
         # Convert the int64 tensor to a list of int64 values
         int64_values = int64_tensor.squeeze().tolist()
@@ -47,7 +49,11 @@ class Chess_NN_Trainer_Data(Dataset):
             int32_values.append(int32_value_2)
 
         # Convert the list of int32 values to a 26x1 int32 tensor
-        int32_tensor = torch.tensor(int32_values, dtype=torch.int32).unsqueeze(1)
+        int32_tensor = torch.tensor(int32_values, dtype=torch.int32)
+        #.unsqueeze(1)
+        logging.debug(f"Int32 Tensor Shape: {int32_tensor.shape}")
+        logging.debug(f"Int32 Tensor Value: {int32_tensor}")
+        logging.debug(f"Int64 Tensor Value: {int64_tensor}")
 
         return int32_tensor
 

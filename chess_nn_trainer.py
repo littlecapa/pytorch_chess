@@ -4,30 +4,39 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from chess_nn import Chess_NN
+from chess_halfkp import Chess_HalfKP
 from chess_nn_trainer_data import Chess_NN_Trainer_Data
 
 class Chess_NN_Trainer():
 
-    def __init__(self, data_path):
-        self.model = Chess_NN()
-        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        #self.model.net.to(device)
+    def __init__(self, FILEPATH, data_path, use_halfkp = False):
+        if use_halfkp:
+          self.model = Chess_HalfKP()
+        else:
+          self.model = Chess_NN()
         self.dataset = Chess_NN_Trainer_Data(data_path)
+        self.filepath = FILEPATH
+        self.use_halfkp = use_halfkp
 
-    def train(self, first = False, batch_size = 1, train_size = 0.95, num_epochs = 10, learning_rate = 0.001):
+    def train(self, first_training = False, batch_size = 1, train_size = 0.95, num_epochs = 10, learning_rate = 0.001):
 
-      #if not first_training:
-      #  self.model = Chess_NN.load_model()
+      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      if not first_training:
+        if self.use_halfkp:
+          self.model = Chess_HalfKP.load_model(self.filepath)
+        else:
+          self.model = Chess_NN.load_model(self.filepath)
       self.model.train()
+      self.model = self.model.to(device)
       train_size = int(train_size * len(self.dataset))
       val_size = len(self.dataset) - train_size
-      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      
       criterion = torch.nn.MSELoss()
       optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
 
       train_dataset, val_dataset = torch.utils.data.random_split(self.dataset, [train_size, val_size])
 
-      train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+      train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
       val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
       for epoch in range(num_epochs):
@@ -42,7 +51,7 @@ class Chess_NN_Trainer():
           # Transfer inputs and labels to the GPU if available
           inputs = inputs.to(device).float()
           labels = labels.to(device).float()
-          self.model = self.model.to(device)
+          #self.model = self.model.to(device)
 
           # Forward pass
           outputs = self.model(inputs)
@@ -56,25 +65,24 @@ class Chess_NN_Trainer():
           running_loss += loss.item()
 
           if index % 10000 == 0:
-             logging.info(f"Index: {index}")
-             logging.info(f"Outputs: {outputs}")
-             logging.info(f"Labels: {labels}")
-             logging.info(f"Loss: {loss}")
-             logging.info(f"Running Loss: {running_loss} {running_loss/index} {math.sqrt(running_loss/(index))}")
+             print(f"Index {index}")
+             logging.debug(f"Index: {index}")
+             logging.debug(f"Outputs: {outputs}")
+             logging.debug(f"Labels: {labels}")
+             logging.debug(f"Loss: {loss} {math.sqrt(loss)} {abs(outputs-labels)}")
+             logging.debug(f"Running Loss: {running_loss/index} {math.sqrt(running_loss/index)}")
 
-        logging.info('[%d, %5d] loss: %.3f' % (epoch + 1, nr_items, running_loss / nr_items, math.sqrt(running_loss / (nr_items))))
-
+        logging.info(f"Running Loss Summary: {running_loss} {running_loss/nr_items} {math.sqrt(running_loss/nr_items)}")
         total_loss = 0.0
         nr_items = len(val_loader)
         logging.info(f"Number Items: {nr_items}")
         for inputs, labels in val_loader:
-          inputs = inputs.to(device)
-          labels = labels.to(device)
+          inputs = inputs.to(device).float()
+          labels = labels.to(device).float()
           outputs = self.model(inputs)
           loss = criterion(outputs, labels)
           total_loss += loss
 
-        logging.info('Average error of the model on the {} tactics positions is {}'.format(nr_items, total_loss/nr_items, math.sqrt(total_loss / (nr_items))))
+        logging.info(f"Running Loss Final: {total_loss} {nr_items} {total_loss/nr_items} {math.sqrt(total_loss/(nr_items))}")
 
-
-      #self.model.save_model()
+      self.model.save_model(self.filepath)
