@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import logging
+import hashlib
 
 class Chess_NN(nn.Module):
     def __init__(self):
@@ -58,9 +59,18 @@ class Chess_NN(nn.Module):
         model = cls()
 
         # Load the state_dict from the specified filepath
-        state_dict = torch.load(cls.get_filename(filepath))
+        logging.info(f"Filepath: {filepath}")
+        state_dict = torch.load(model.get_filename(filepath))
 
         # Load the state_dict into the model
         model.load_state_dict(state_dict)
 
         return model
+    
+    def get_hash_value(self):
+        state_dict = self.state_dict()
+        hashable_state_dict = frozenset(state_dict.items())
+        hash_value = hash(hashable_state_dict)
+        logging.debug(f"Hash Net Params: {hash_value}")
+        logging.info(f"Hash Value: {hash_value}")
+        return hash(hash_value)

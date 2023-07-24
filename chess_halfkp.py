@@ -8,12 +8,12 @@ class Chess_HalfKP(Chess_NN):
 #
 # Define a PyTorch net that resembles the Stockfish HalfKP net
 #
-    def __init__(self):
-        super(Chess_HalfKP, self).__init__()
-
+    def init(self, input_size):
+        second_level_size = max(512, input_size*2)
+        third_level_size = second_level_size/16
         # The first linear layer takes the 26-int32 board state and
         # produces a 256-dimensional representation.
-        self.lin1 = torch.nn.Linear(26, 512)
+        self.lin1 = torch.nn.Linear(input_size, second_level_size)
 
         # The first clipped ReLU layer clips the output of the
         # linear layer to a range of 0 to 1.
@@ -21,7 +21,7 @@ class Chess_HalfKP(Chess_NN):
 
         # The second linear layer takes the 256-dimensional
         # representation and produces a 32-dimensional representation.
-        self.lin2 = torch.nn.Linear(512, 32)
+        self.lin2 = torch.nn.Linear(second_level_size, 32)
 
         # The second clipped ReLU layer clips the output of the
         # linear layer to a range of 0 to 1.
@@ -39,6 +39,15 @@ class Chess_HalfKP(Chess_NN):
 
         # Initialize the network parameters to zeros
         self.init_weights()
+
+    def __init__(self):
+        super(Chess_NN, self).__init__()
+        self.init(26)
+
+    def init_weights(self):
+        for layer in [self.lin1, self.lin2, self.lin3, self.lin4]:
+            nn.init.zeros_(layer.weight)
+            nn.init.zeros_(layer.bias)
 
     def forward(self, x):
         logging.debug(f"Input Net: {x}")

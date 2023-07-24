@@ -23,13 +23,23 @@ class Chess_NN_Trainer_Data(Dataset):
             return self.convert_int64_to_int32(self.data[idx]), self.eval.align_eval(self.labels[idx])
         return self.convert_int64_to_int32(self.data[idx]), self.labels[idx]
 
-    def convert_int64_to_int32(self, int64_tensor):
+    def verify_int64_tensor(self, int64_tensor):
         # Check if the input tensor has the correct shape (13x1)
         if int64_tensor.shape != torch.Size([13]):
             logging.error(f"Int64 Tensor Shape: {int64_tensor.shape}")
             logging.error(f"Int64 Tensor Value: {int64_tensor}")
             raise ValueError("Input tensor must have torch.Size([13])")
 
+    def convert_int64_to_bool(self, int64_tensor):
+        self.verify_int64_tensor(int64_tensor)
+        # Create a boolean tensor with size (13x64)
+        boolean_tensor = (int64_tensor.unsqueeze(1) & (1 << torch.arange(64).to(int_tensor.device))) > 0
+        # Reshape the boolean tensor to size (832)
+        boolean_tensor = boolean_tensor.view(-1)
+        return boolean_tensor
+    
+    def convert_int64_to_int32(self, int64_tensor):
+        self.verify_int64_tensor(int64_tensor)
         # Convert the int64 tensor to a list of int64 values
         int64_values = int64_tensor.squeeze().tolist()
 
