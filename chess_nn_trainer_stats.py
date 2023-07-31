@@ -1,6 +1,7 @@
 import logging
 import datetime
 import math
+import random
 
 class Chess_NN_Trainer_Stats():
 
@@ -12,15 +13,22 @@ class Chess_NN_Trainer_Stats():
         filename_info = file_path + "info_" + current_datetime + ".txt"
         self.outfile_info = open(filename_info, "w")
         logging.debug(f"Info File created {filename_info}")
+        filename_tests = file_path + "tests_" + current_datetime + ".txt"
+        self.outfile_tests = open(filename_tests, "w")
+        logging.debug(f"Info File created {filename_tests}")
+        self.latest_filename = ""
+        self.loss_calls = random.randint(0, 9999)
 
     def __del__(self):
         self.flush()
         self.outfile_info.close()
         self.outfile_stats.close()
+        self.outfile_tests.close()
 
     def flush(self):
         self.outfile_info.flush()
         self.outfile_stats.flush()
+        self.outfile_tests.flush()
     
     def datetime2str(self):
         # Get the current datetime
@@ -30,12 +38,44 @@ class Chess_NN_Trainer_Stats():
         # For example, to display the date and time in ISO 8601 format:
         return current_datetime.strftime('%Y_%m_%d_%H_%M_%S')
 
+    def start_testing(self, info = "Start"):
+        self.error = 0
+        self.nr_tests = 0
+        self.outfile_tests.write(f"{datetime.datetime.now()};{info} - {self.latest_filename};;;\n")
+        self.latest_filename
+
+    def write_test_results(self, test_id, test_info, value, expected_value):
+        self.nr_tests += 1
+        v = round(value.item(),2)
+        e = round(expected_value.item(),2)
+        logging.info(f"Result: {v} {e}")
+        self.error += abs(v-e)
+        self.outfile_tests.write(f"{datetime.datetime.now()};test result;{test_id};{v};{e};{abs(v-e)}\n")
+        if test_info != "":
+            pass
+            #self.outfile_tests.write(f"{datetime.datetime.now()};{test_info};;;\n")
+
+    def end_testing(self):
+        self.outfile_tests.write(f"{datetime.datetime.now()};total results;;{self.nr_tests};{round(self.error,2)};{round(self.error/self.nr_tests, 2)}\n")
+        self.error = 0
+        self.nr_tests = 0
+        self.flush()
+
     def write_info(self, parameter, value):
         self.outfile_info.write(f"{datetime.datetime.now()};{parameter};{value}\n")
 
     def write_net_infos(self, model):
         for name, param in model.state_dict().items():
             self.write_info(name, param.shape)
+
+    def write_loss_function_infos(self, out_tensor, label_tensor, loss_tensor):
+        self.loss_calls += 1
+        if self.loss_calls > 5000:
+            self.loss_calls = 0
+            for out, label, loss in zip(out_tensor, label_tensor, loss_tensor):
+                self.write_info("Out", out)
+                self.write_info("Label", label)
+                self.write_info("Loss", loss)
 
     def start_file(self, filename, nr_items, nr_items_val):
         self.latest_filename = filename

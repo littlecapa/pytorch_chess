@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
+import torch.onnx
 import logging
-import hashlib
+from nn_hash import nn_Hash
 
-class Chess_NN(nn.Module):
+class Chess_NN(nn_Hash):
     def __init__(self):
         super(Chess_NN, self).__init__()
 
@@ -15,13 +16,13 @@ class Chess_NN(nn.Module):
 
         # Initialize the network parameters to zeros
         self.init_weights()
-        self.set2train
-
-    def set2train(self):
-        self.train()
-
-    def set2evaluate(self):
-        self.evaluate()
+        self.set2train()
+        size = (26,)
+        self.sample_input = torch.randint(0, 100, size=size, dtype=torch.int32)
+        self.onnx_counter = 0
+    
+    def get_name(self):
+        return "NN_V01"
 
     def init_weights(self):
         for layer in [self.fc1, self.fc2, self.fc3, self.fc4, self.fc5]:
@@ -30,47 +31,18 @@ class Chess_NN(nn.Module):
 
     def forward(self, x):
         logging.debug(f"Input Net: {x}")
+        self.sample_input = x
         #x = x.to(torch.float32)  # Convert input to float32
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         x = torch.relu(self.fc3(x))
         x = torch.relu(self.fc4(x))
         x = self.fc5(x)
-
         x = self.clamp_output(x)
         logging.debug(f"Output Net: {x}")
-
         return x.view(-1)
     
     def clamp_output(self, x):
          # Clip the output to be between -15.0 and 15.0
         return torch.clamp(x, min=-15.0, max=15.0)
     
-    def get_filename(self, path):
-        return path + self.__class__.__name__ + ".pth"
-    
-    def save_model(self, filepath):
-        # Save the model's state_dict to the specified filepath
-        torch.save(self.state_dict(), self.get_filename(filepath))
-
-    @classmethod
-    def load_model(cls, filepath):
-        # Create an instance of the HalfKPNet
-        model = cls()
-
-        # Load the state_dict from the specified filepath
-        logging.info(f"Filepath: {filepath}")
-        state_dict = torch.load(model.get_filename(filepath))
-
-        # Load the state_dict into the model
-        model.load_state_dict(state_dict)
-
-        return model
-    
-    def get_hash_value(self):
-        state_dict = self.state_dict()
-        hashable_state_dict = frozenset(state_dict.items())
-        hash_value = hash(hashable_state_dict)
-        logging.debug(f"Hash Net Params: {hash_value}")
-        logging.info(f"Hash Value: {hash_value}")
-        return hash(hash_value)

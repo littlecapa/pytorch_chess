@@ -4,12 +4,14 @@ from enum import Enum
 import numpy as np
 
 class Chess_Eval():
-  MIN = -1500
-  MAX = 1500
+  MIN = -15.0
+  MAX = 15.0
 
-  def align_eval(self, float_eval):
-    value = round(float_eval*100)
-    return min(max(value, self.MIN), self.MAX)/100
+  def align_eval(self, eval):
+    
+    aligned_eval = min(max(eval, self.MIN), self.MAX)
+    logging.debug(f"Aligned Eval: {aligned_eval} {eval}")
+    return round(aligned_eval,2)
 
   piece_values = {
             chess.PAWN: 1.,

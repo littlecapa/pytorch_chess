@@ -1,117 +1,115 @@
 import logging
 import math
 import torch
-#import torch.nn as nn
-#from torch.utils.data import DataLoader, Dataset
-from chess_nn import Chess_NN
+import io
 from chess_halfkp import Chess_HalfKP
 from chess_nn_trainer_data import Chess_NN_Trainer_Data
+from chess_nn_trainer_test_data import Chess_NN_Trainer_Test_Data
 from chess_nn_trainer_stats import Chess_NN_Trainer_Stats
+from math import sqrt
+from loss_function import eval_loss_function
 
 class Chess_NN_Trainer():
 
-    def __init__(self, FILEPATH, stats, data_path, use_halfkp = False):
-        self.stats = stats
-        if use_halfkp:
-          self.model = Chess_HalfKP()
-          self.stats.write_info("Model", "Chess_HalfK")
-        else:
-          self.model = Chess_NN()
-          self.stats.write_info("Model", "Chess_NN")
-        self.stats.write_net_infos(self.model)
-        self.data_path = data_path
-        self.dataset = Chess_NN_Trainer_Data(data_path)
-        self.filepath = FILEPATH
-        self.use_halfkp = use_halfkp
-        self.net_hash_value = None
+  INIT_HASH = 0
 
-    def train(self, first_training = False, batch_size = 1, train_size = 0.95, num_epochs = 10, learning_rate = 0.001, shuffle = False, use_mse = True):
+  def __init__(self, stats_path, data_path, baseline_test_data_path, first_training = False, filename = "chess.h5", learning_rate = 1e-2):
+    self.stats = Chess_NN_Trainer_Stats(stats_path)
+    self.dataset = Chess_NN_Trainer_Data(data_path, baseline_test_data_path)
+    test_dataset = Chess_NN_Trainer_Test_Data(baseline_test_data_path)
+    self.test_data_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=True)
+    self.filename = filename
+    self.data_path = data_path
+    self.learning_rate = learning_rate
+    self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    self.init_components()
+    self.hash = self.INIT_HASH
+    if not first_training:
+      self.resume(eval = False)
 
-      device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-      self.stats.write_info("Device", device)
-      self.stats.write_info("Batch Size", batch_size)
-      self.stats.write_info("Train Size", train_size)
-      self.stats.write_info("Learning Rate", learning_rate)
-      self.stats.write_info("Shuffle", shuffle)
-      if not first_training:
-        if self.use_halfkp:
-          self.model = Chess_HalfKP.load_model(self.filepath)
-        else:
-          self.model = Chess_NN.load_model(self.filepath)
-        new_net_hash_value = self.model.get_hash_value()
-        logging.info(f"New Hash Value: {new_net_hash_value}")
-        if self.net_hash_value is not None:
-          logging.info(f"Old Hash Value: {self.net_hash_value}")
-          if self.net_hash_value != new_net_hash_value:
-            raise ValueError(f"Invalid Net Hash Value! Expected:{self.net_hash_value}, got {new_net_hash_value}")
-          
-      self.model.train()
-      self.model = self.model.to(device)
-      train_size = int(train_size * len(self.dataset))
-      val_size = len(self.dataset) - train_size
-      
-      if use_mse:
-        criterion = torch.nn.MSELoss()
-        self.stats.write_info("Criterion", "torch.nn.MSELoss")
-      else:
-        criterion = torch.nn.L1Loss()  # Use L1Loss for MAE
-        self.stats.write_info("Criterion", "torch.nn.L1Losss")
-      optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+  def init_components(self):
+    self.machine = Chess_HalfKP()
+    self.machine.to(self.device)
+    self.stats.write_net_infos(self.machine)
+    self.optimizer = torch.optim.Adam(self.machine.parameters(), self.learning_rate, weight_decay=1e-5)
+    self.criterion = torch.nn.MSELoss(reduction='mean')
+    torch.backends.cudnn.enabled = True
 
-      train_dataset, val_dataset = torch.utils.data.random_split(self.dataset, [train_size, val_size])
+  def rest(self):
+    torch.save(self.machine.state_dict(), self.filename)
+    self.hash = self.machine.get_hash_value()
+    print(f"Resting Hash: {self.hash}")
+    self.machine.eval()
+    self.do_baseline_testing()
+    self.machine = None
 
-      train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
-      val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle)
+  def resume(self, eval = True):
+    self.init_components()
+    self.machine.load_state_dict(torch.load(self.filename))
+    new_hash = self.machine.get_hash_value()
+    print(f"Resuming Hash: {new_hash}")
+    if self.hash != self.INIT_HASH:
+        if self.hash != self.hash:
+            logging.error(f"Old hash: {self.hash}, New Hash: {new_hash}")
+    self.hash = new_hash
+    if eval:
+        self.machine.eval()
+    else:
+        self.machine.train()
+    self.do_baseline_testing()
+  
+  def run_machine(self, loader, training = False, base_line = False):
+    if training:
+      self.machine.train()
+    else:
+       self.machine.eval()
+    running_loss = 0.0
+    index = 0
+    for x, y in loader:
+      index += 1
+      x = x.to(self.device).float()
+      y = y.to(self.device).float()
+      logging.debug(f"X: {x}")
+      outputs = self.machine(x)
+      #loss = self.criterion(outputs, y)
+      loss = eval_loss_function(outputs, y, self.device, self.stats)
+      if base_line:
+        self.stats.write_test_results(index, "", outputs, y)
+      if training:
+        loss.backward()
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+      running_loss += loss.item()
+    return running_loss        
 
-      self.stats.start_file(self.data_path, train_size, val_size)
+  def do_training(self, batch_size = 1, train_size = 0.95, num_epochs = 10, shuffle = False):
 
-      sum_loss = 0
-
-      for epoch in range(num_epochs):
+    self.stats.start_file(self.data_path, train_size, 1-train_size)
+    train_size = int(train_size * len(self.dataset))
+    val_size = len(self.dataset) - train_size        
+    train_dataset, val_dataset = torch.utils.data.random_split(self.dataset, [train_size, val_size])
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle)
+    sum_loss = 0
+    for epoch in range(num_epochs):
         self.stats.start_epoch(epoch)
-        self.model.train()
-        running_loss = 0.0
-        nr_items = len(train_loader)
-        index = 0
-        for inputs, labels in train_loader:
-          index += 1
-          # Transfer inputs and labels to the GPU if available
-          inputs = inputs.to(device).float()
-          labels = labels.to(device).float()
-          #self.model = self.model.to(device)
-
-          # Forward pass
-          outputs = self.model(inputs)
-
-          # Compute the loss
-          loss = criterion(outputs, labels)
-
-          optimizer.zero_grad()
-          loss.backward()
-          optimizer.step()
-          running_loss += loss.item()
-
-          if index % (40960/batch_size) == 0:
-             print(f"Index {index}")
-             logging.debug(f"Index: {index}")
-             logging.debug(f"Outputs: {outputs}")
-             logging.debug(f"Labels: {labels}")
-             logging.debug(f"Loss: {loss} {math.sqrt(loss)} {abs(outputs-labels)}")
-             logging.debug(f"Running Loss: {running_loss/index} {math.sqrt(running_loss/index)}")
-        sum_loss += running_loss 
-
+        running_loss = self.run_machine(train_loader, training = True)
+        sum_loss += running_loss
+        logging.debug(f'Training Results! Epoch:{epoch}, Running Loss:{int(running_loss)}, Items: {int((len(train_dataset)))}, Avg: {round(running_loss/(len(train_dataset)),2)} {round(sqrt(running_loss/(len(train_dataset))),2)}')
+        self.do_validation(val_loader)
         self.stats.end_epoch(running_loss)
-        total_loss = 0.0
-        nr_items = len(val_loader)
-        for inputs, labels in val_loader:
-          inputs = inputs.to(device).float()
-          labels = labels.to(device).float()
-          outputs = self.model(inputs)
-          loss = criterion(outputs, labels)
-          total_loss += loss
-        self.stats.end_validation(total_loss)
+    self.rest()
+    self.stats.end_file(sum_loss, num_epochs)
 
-      self.stats.end_file(sum_loss, num_epochs)
-      self.net_hash_value = self.model.get_hash_value()
-      logging.info(f"New Hash Value: {self.net_hash_value}")
-      self.model.save_model(self.filepath)
+  def do_validation(self, val_loader):
+    with torch.no_grad():
+      running_loss = self.run_machine(val_loader, training = False)
+    logging.debug(f'Validation Results! Running Loss:{running_loss}, Items: {len(val_loader)}, Avg: {running_loss/len(val_loader)}')
+    self.stats.end_validation(running_loss)
+
+  def do_baseline_testing(self):
+    self.stats.start_testing()
+    with torch.no_grad():
+      running_loss = self.run_machine(self.test_data_loader, training = False, base_line = True)
+    logging.debug(f'Results Baseline Testing! Running Loss:{running_loss}, Items: {len(self.test_data_loader)}, Avg: {running_loss/len(self.test_data_loader)}')
+    self.stats.end_testing()

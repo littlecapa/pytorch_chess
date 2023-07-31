@@ -39,6 +39,11 @@ class Chess_HalfKP(Chess_NN):
 
         # Initialize the network parameters to zeros
         self.init_weights()
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.to(device)
+        size = (26,)
+        self.sample_input = torch.randint(0, 100, size=size, dtype=torch.int32).to(device).float()
+        self.onnx_counter = 0
 
     def __init__(self):
         super(Chess_NN, self).__init__()
@@ -50,8 +55,7 @@ class Chess_HalfKP(Chess_NN):
             nn.init.zeros_(layer.bias)
 
     def forward(self, x):
-        logging.debug(f"Input Net: {x}")
-        #x = x.to(torch.float32)  # Convert input to float32
+        #logging.debug(f"Input Net: {x} {x.shape} {x.dtype}")
         x = self.lin1(x)
         x = self.clip1(x)
         x = self.lin2(x)
@@ -61,6 +65,9 @@ class Chess_HalfKP(Chess_NN):
 
         # Clip the output to be between -15.0 and 15.0
         x = self.clamp_output(x)
-        logging.debug(f"Output Net: {x}")
+        #logging.debug(f"Output Net: {x}")
 
         return x.view(-1)
+    
+    def get_name(self):
+        return "HALFKP_V01"

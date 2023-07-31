@@ -7,8 +7,8 @@ from chess_nn_trainer import Chess_NN_Trainer
 FILEPATH = "G:/Meine Ablage/data/nn_chess/"
 #FILEPATH = "C:/Users/littl/Documents/AI/tmp/"
 FILE_PREFIX ="commentated_li_"
-FILE_RANGE = 1
-SMALL_TEST = True
+FILE_RANGE = 2
+SMALL_TEST = False
 
 def setup_logging():
     logging.basicConfig(
@@ -31,21 +31,15 @@ def check_env(stats):
 
 def main():
     setup_logging()
-    logging.debug('Starting the program')
-    stats = Chess_NN_Trainer_Stats(FILEPATH + "stats/")
-
-    check_env(stats)
     first_training = True
-    
-    for i in range(FILE_RANGE):
-        if SMALL_TEST:
-            input_file = FILEPATH + "merge.csv"
-        else:
-            input_file = FILEPATH + FILE_PREFIX + str(i) + ".csv"
-        trainer = Chess_NN_Trainer(FILEPATH, stats, input_file, use_halfkp = True)
-        trainer.train(first_training = first_training, shuffle = True, batch_size=1024, num_epochs = 10, learning_rate = 0.1)
+    logging.debug('Starting the program')
+    input_file_pattern = FILEPATH + "commentated_li_"
+    #input_file = FILEPATH + "commentated_wolga_9.csv"
+    for i in range(2):
+        input_file = input_file_pattern + str(i) + ".csv"
+        trainer = Chess_NN_Trainer( stats_path = FILEPATH + "stats/", data_path = input_file, baseline_test_data_path = FILEPATH + "baseline_test_data.csv", first_training = first_training, filename = "chess.h5", learning_rate = 1e-2)
+        trainer.do_training(batch_size = 1, train_size = 0.98, num_epochs = 2, shuffle = False)
         first_training = False
-
     logging.debug('Program execution completed')
 
 # Call the main function if the script is executed directly
