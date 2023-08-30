@@ -31,14 +31,14 @@ def check_env(stats):
 
 def main():
     setup_logging()
-    first_training = True
+    first_training = False
     logging.debug('Starting the program')
     input_file_pattern = FILEPATH + "commentated_li_"
-    #input_file = FILEPATH + "commentated_wolga_9.csv"
-    for i in range(2):
-        input_file = input_file_pattern + str(i) + ".csv"
-        trainer = Chess_NN_Trainer( stats_path = FILEPATH + "stats/", data_path = input_file, baseline_test_data_path = FILEPATH + "baseline_test_data.csv", first_training = first_training, filename = "chess.h5", learning_rate = 1e-2)
-        trainer.do_training(batch_size = 1, train_size = 0.98, num_epochs = 2, shuffle = False)
+    input_file = FILEPATH + "commentated_wolga_9.csv"
+    trainer = Chess_NN_Trainer( stats_path = FILEPATH + "stats/",  baseline_test_data_path = FILEPATH + "baseline_test_data.csv", first_training = first_training, filename = "chess.h5", learning_rate = 1e-5)
+    for i in range(1):
+        input_file = input_file_pattern + str(i+4) + ".csv"
+        trainer.do_training(data_path = input_file, batch_size = 1, train_size = 0.9, num_epochs = 3, shuffle = True)
         first_training = False
     logging.debug('Program execution completed')
 

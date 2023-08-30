@@ -12,6 +12,14 @@ class Chess_Eval():
     aligned_eval = min(max(eval, self.MIN), self.MAX)
     logging.debug(f"Aligned Eval: {aligned_eval} {eval}")
     return round(aligned_eval,2)
+  
+  def clamp_float(value, range = 15.0, min = np.finfo(np.float32).min, max = np.finfo(np.float32).max):
+    if min * -1. == max or value >= 0.0:
+      return (value / max) * range
+    else:
+      return (value / min) * range
+
+
 
   piece_values = {
             chess.PAWN: 1.,

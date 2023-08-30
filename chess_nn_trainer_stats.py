@@ -6,15 +6,16 @@ import random
 class Chess_NN_Trainer_Stats():
 
     def __init__(self, file_path):
+        method = 'a'
         current_datetime = self.datetime2str()  
         filename_stats = file_path + "stats_" + current_datetime + ".csv"
-        self.outfile_stats = open(filename_stats, "w")
+        self.outfile_stats = open(filename_stats, method)
         logging.debug(f"Stats File created {filename_stats}")
         filename_info = file_path + "info_" + current_datetime + ".txt"
-        self.outfile_info = open(filename_info, "w")
+        self.outfile_info = open(filename_info, method)
         logging.debug(f"Info File created {filename_info}")
         filename_tests = file_path + "tests_" + current_datetime + ".txt"
-        self.outfile_tests = open(filename_tests, "w")
+        self.outfile_tests = open(filename_tests, method)
         logging.debug(f"Info File created {filename_tests}")
         self.latest_filename = ""
         self.loss_calls = random.randint(0, 9999)
@@ -43,8 +44,15 @@ class Chess_NN_Trainer_Stats():
         self.nr_tests = 0
         self.outfile_tests.write(f"{datetime.datetime.now()};{info} - {self.latest_filename};;;\n")
         self.latest_filename
+        self.start_tests = True
 
     def write_test_results(self, test_id, test_info, value, expected_value):
+        if self.start_tests:
+            self.start_tests = False
+            self.first_value = value
+            self.bad_testing = True
+        if self.first_value != value:
+            self.bad_testing = False
         self.nr_tests += 1
         v = round(value.item(),2)
         e = round(expected_value.item(),2)
@@ -54,12 +62,16 @@ class Chess_NN_Trainer_Stats():
         if test_info != "":
             pass
             #self.outfile_tests.write(f"{datetime.datetime.now()};{test_info};;;\n")
+        if test_id > 1000:
+            self.flush()
 
     def end_testing(self):
         self.outfile_tests.write(f"{datetime.datetime.now()};total results;;{self.nr_tests};{round(self.error,2)};{round(self.error/self.nr_tests, 2)}\n")
         self.error = 0
         self.nr_tests = 0
         self.flush()
+        if self.bad_testing:
+            raise ValueError("Bad Testing")
 
     def write_info(self, parameter, value):
         self.outfile_info.write(f"{datetime.datetime.now()};{parameter};{value}\n")
@@ -89,11 +101,11 @@ class Chess_NN_Trainer_Stats():
         self.outfile_stats.write(f"{datetime.datetime.now()};{self.latest_filename};{self.latest_nr_items};Start Epoch;{str(epoch)};;;\n")
     
     def end_epoch(self, total_loss):
-        self.outfile_stats.write(f"{datetime.datetime.now()};{self.latest_filename};{self.latest_nr_items};End Epoch;{str(self.latest_epoch)};{total_loss};{total_loss/self.latest_nr_items};{math.sqrt(total_loss/self.latest_nr_items)}\n")
+        self.outfile_stats.write(f"{datetime.datetime.now()};{self.latest_filename};{self.latest_nr_items};End Epoch;{str(self.latest_epoch)};{total_loss};{total_loss/self.latest_nr_items}\n")
         self.flush()
 
     def end_validation(self, running_loss):
-        self.outfile_stats.write(f"{datetime.datetime.now()};{self.latest_filename};{self.latest_nr_items_val};End Validation;{str(self.latest_epoch)};{running_loss};{running_loss/self.latest_nr_items_val};{math.sqrt(running_loss/self.latest_nr_items_val)}\n")
+        self.outfile_stats.write(f"{datetime.datetime.now()};{self.latest_filename};{self.latest_nr_items_val};End Validation;{str(self.latest_epoch)};{running_loss};{running_loss/self.latest_nr_items_val}\n")
         self.flush()
 
     def end_file(self, total_loss, num_epochs):

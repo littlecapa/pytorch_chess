@@ -28,7 +28,7 @@ class Chess_NN_Trainer_Data(Dataset):
     def load_data(self, data_path):
         with open(data_path, 'r') as file:
             lines = file.readlines()
-        logging.info(f"File: {data_path}, Lines: {len(lines)}")
+        logging.debug(f"File: {data_path}, Lines: {len(lines)}")
         for line in lines:
             values = line.strip().split(';')
             # -2 wegen ; nach letztem Element, sonst wäre das -1
